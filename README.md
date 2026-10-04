@@ -148,3 +148,46 @@ twice). For infinitely many it gives the line, as in
 
 The equations can be written in any linear form, such as `y = (2/5)x + 1`,
 `25 × q + 10 × d = 450` or `2(x + y) = 3x - 1`.
+
+## Quadratic equations
+
+[`quadratic.h`](include/quadratic.h) solves quadratic equations step by step
+with any of the
+[three methods](https://www.basic-mathematics.com/solving-quadratic-equations.html):
+
+| Method | `QuadraticMethod` | `./algebra` option |
+|---|---|---|
+| [Factoring](https://www.basic-mathematics.com/solving-quadratic-equations-by-factoring.html) | `QUADRATIC_FACTORING` | `--factoring` |
+| [Completing the square](https://www.basic-mathematics.com/solve-by-completing-the-square.html) | `QUADRATIC_COMPLETING_THE_SQUARE` | `--square` |
+| [Quadratic formula](https://www.basic-mathematics.com/solve-using-the-quadratic-formula.html) | `QUADRATIC_FORMULA` | `--formula` (the default) |
+
+```bash
+$ ./algebra --square "x^2 + 6x + 8 = 0"
+x^2 + 6x + 8 = 0
+  x² + 6x = -8                  Subtract 8 from each side
+  x² + 6x + 9 = 1               Add (6/2)² = 9 to each side
+  (x + 3)² = 1                  Write the left side as a square
+  x + 3 = ±1                    Take the square root of each side
+  x = -2 or x = -4               Subtract 3 from each side
+Two solutions: x = -2 or x = -4
+```
+
+Write powers as `x^2` or `x²`. The equation can be in any form, such as
+`(9 - w)w = 14` or `30 = -16t^2 + 28t`; it is first rewritten as
+`ax² + bx + c = 0`.
+
+Answers are exact. The
+[discriminant](https://www.basic-mathematics.com/discriminant-of-a-quadratic-equation.html)
+b² - 4ac decides what kind they are:
+
+| Discriminant | Solutions | Example |
+|---|---|---|
+| positive | two real: fractions or square roots | `x = 3 or x = -1/4`, `x = -2 ± √3` |
+| zero | one real | `x = -3/2` |
+| negative | two complex | `x = -4 ± 3i` |
+
+Factoring only works when the solutions are fractions; otherwise it says to
+use another method. `quadratic_vertex` finds the minimum or maximum at
+x = -b/2a, as in the
+[word problems](https://www.basic-mathematics.com/word-problems-involving-quadratic-equations.html):
+the cost `0.00002x^2 - 0.04x + 38` is lowest at `x = 1000`.
