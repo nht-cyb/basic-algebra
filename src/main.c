@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "expression.h"
+#include "inequality.h"
 #include "linear.h"
 #include "quadratic.h"
 #include "system.h"
@@ -108,6 +109,43 @@ static int solve_system(const char *text) {
     return 0;
 }
 
+/* "5x - 2 ≥ 13": prints the steps, the solution and its graph. With two
+   variables, as in "y > (2/3)x + 1", it graphs it on the plane instead. */
+static int solve_inequality(const char *text) {
+    InequalitySolution s;
+    PlaneInequality p;
+    char graph[8192], interval[128];
+
+    if (plane_inequality_read(text, &p) == NULL) {
+        plane_inequality_describe(&p, graph, sizeof graph);
+        printf("%s\n%s\n", text, graph);
+        plane_inequality_graph(&p, graph, sizeof graph);
+        printf("%s\n", graph);
+        return 0;
+    }
+    if (!inequality_solve(text, &s)) {
+        printf("%s -> cannot solve: %s\n", text, s.error);
+        return 1;
+    }
+    for (int i = 0; i < s.step_count; i++) {
+        if (i == 0) {
+            printf("%s\n", s.steps[i].equation);
+        } else {
+            printf("  %-30s %s\n", s.steps[i].equation, s.steps[i].action);
+        }
+    }
+    solution_set_interval_notation(&s.set, interval, sizeof interval);
+    printf("Solution: %s, or %s in interval notation\n", s.text, interval);
+    solution_set_graph(&s.set, graph, sizeof graph);
+    printf("%s\n", graph);
+    return 0;
+}
+
+static int has_relation(const char *s) {
+    return strpbrk(s, "<>") != NULL || strstr(s, "!=") != NULL ||
+           strstr(s, "≤") != NULL || strstr(s, "≥") != NULL || strstr(s, "≠") != NULL;
+}
+
 /* "Seven more than three times a number x": prints 3x + 7 */
 static int translate(const char *phrase) {
     char text[256];
@@ -145,12 +183,15 @@ int main(int argc, char **argv) {
         fprintf(stderr, "example: %s \"9x - 12 = 5x + 8\"\n", argv[0]);
         fprintf(stderr, "example: %s \"x + y = 20; x - y = 10\"\n", argv[0]);
         fprintf(stderr, "example: %s --factoring \"x^2 + 3x + 2 = 0\"\n", argv[0]);
+        fprintf(stderr, "example: %s \"|x - 4| < 7\"\n", argv[0]);
         return 2;
     }
 
     for (int i = 1; i < argc; i++) {
         if (i > 1) printf("\n");
-        if (strchr(argv[i], ';') != NULL) {
+        if (has_relation(argv[i])) {
+            failed |= solve_inequality(argv[i]);
+        } else if (strchr(argv[i], ';') != NULL) {
             failed |= solve_system(argv[i]);
         } else if (strchr(argv[i], '=') != NULL) {
             failed |= solve(argv[i]);
