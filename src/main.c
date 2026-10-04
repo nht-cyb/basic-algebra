@@ -1,25 +1,72 @@
 #include <stdio.h>
+#include <string.h>
 #include "expression.h"
+#include "linear.h"
+
+/* "2x - 2 = 6": prints the steps and the solution */
+static int solve(const char *equation) {
+    LinearSolution s;
+    char value[48];
+
+    linear_solve(equation, &s);
+    if (s.kind == LINEAR_INVALID) {
+        printf("%s -> cannot solve: %s\n", equation, s.error);
+        return 1;
+    }
+    for (int i = 0; i < s.step_count; i++) {
+        if (i == 0) {
+            printf("%s\n", s.steps[i].equation);
+        } else {
+            printf("  %-24s %s\n", s.steps[i].equation, s.steps[i].action);
+        }
+    }
+    switch (s.kind) {
+    case LINEAR_ONE_SOLUTION:
+        fraction_format(s.value, value, sizeof value);
+        printf("Solution: %c = %s\n", s.variable, value);
+        break;
+    case LINEAR_NO_SOLUTION:
+        printf("No solution: the %c terms cancel and the numbers left are not equal\n", s.variable);
+        break;
+    default:
+        printf("Every number is a solution: both sides are the same\n");
+        break;
+    }
+    return 0;
+}
+
+/* "Seven more than three times a number x": prints 3x + 7 */
+static int translate(const char *phrase) {
+    char text[256];
+    Expr *e = expr_parse(phrase);
+    int failed = e == NULL || expr_format(e, text, sizeof text) < 0;
+
+    if (failed) {
+        printf("%s -> (not understood)\n", phrase);
+    } else {
+        printf("%s -> %s\n", phrase, text);
+    }
+    expr_free(e);
+    return failed;
+}
 
 int main(int argc, char **argv) {
-    char text[256];
     int failed = 0;
 
     if (argc < 2) {
-        fprintf(stderr, "usage: %s \"phrase\" ...\n", argv[0]);
+        fprintf(stderr, "usage: %s \"phrase or equation\" ...\n", argv[0]);
         fprintf(stderr, "example: %s \"Seven more than three times a number x\"\n", argv[0]);
+        fprintf(stderr, "example: %s \"9x - 12 = 5x + 8\"\n", argv[0]);
         return 2;
     }
 
     for (int i = 1; i < argc; i++) {
-        Expr *e = expr_parse(argv[i]);
-        if (e == NULL || expr_format(e, text, sizeof text) < 0) {
-            printf("%s -> (not understood)\n", argv[i]);
-            failed = 1;
+        if (i > 1) printf("\n");
+        if (strchr(argv[i], '=') != NULL) {
+            failed |= solve(argv[i]);
         } else {
-            printf("%s -> %s\n", argv[i], text);
+            failed |= translate(argv[i]);
         }
-        expr_free(e);
     }
     return failed;
 }
