@@ -54,4 +54,5 @@ dkms.conf
 # debug information files
 *.dwo
 algebra
-tests/test_quiz
+tests/test_*
+!tests/test_*.c

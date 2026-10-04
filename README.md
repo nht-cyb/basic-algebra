@@ -7,7 +7,7 @@ Basic algebra functions in C, following the
 
 ```bash
 make          # builds ./algebra from every file in src/
-make test     # runs the lesson quizzes in tests/
+make test     # checks every function against the lesson examples in tests/
 make clean
 ```
 
@@ -35,3 +35,57 @@ Seven more than three times a number x -> 3x + 7
 
 "a number" is `x` and "another number" is `y`, unless a letter follows, as in
 "a number p". `added to` and `subtracted from` also work.
+
+## Exponents
+
+[`exponent.h`](include/exponent.h) works with powers such as `4^11` or
+`(2/3)^3`, following the lessons on
+[exponents](https://www.basic-mathematics.com/exponents.html),
+[laws of exponents](https://www.basic-mathematics.com/laws-of-exponents.html) and
+[properties of exponents](https://www.basic-mathematics.com/properties-of-exponents.html).
+Values are exact fractions, so `8^-4` is `1/4096`.
+
+| Function | Property | Example |
+|---|---|---|
+| `power_value` | x^0 = 1, x^-n = 1 / x^n, (x/y)^n = x^n / y^n | `(2/3)^3` = `8/27`, `(-2)^7` = `-128` |
+| `power_multiply` | x^n × x^m = x^(n + m) | `3^2 × 3^-8` = `3^-6` |
+| `power_divide` | x^n ÷ x^m = x^(n - m) | `9^4 ÷ 9^-3` = `9^7` |
+| `power_of_power` | (x^n)^m = x^(n × m) | `(6^5)^200` = `6^1000` |
+| `power_root` | x^(1/n) = nth root of x | `27^(1/3)` = `3` |
+
+`-2^6` is `-(2^6)` = `-64`, which is not `(-2)^6` = `64`. `power_format`
+writes a negative base in parentheses so the two don't get mixed up.
+
+## Rational and irrational numbers
+
+`classify_number` in [`rational.h`](include/rational.h) says whether a
+number is [rational](https://www.basic-mathematics.com/rational-numbers.html)
+or [irrational](https://www.basic-mathematics.com/irrational-numbers.html),
+and gives rational numbers as a fraction:
+
+| Input | Result |
+|---|---|
+| `-8/2`, `0.75`, `0.150` | rational: `-4`, `3/4`, `3/20` |
+| `0.(21)` (0.212121...) | rational: `7/33` |
+| `√4`, `3√125` | rational: `2`, `5` |
+| `√2`, `5√325`, `pi`, `e`, `golden ratio` | irrational |
+
+Write a repeating decimal with the repeating part in parentheses. A
+decimal without them ends where it is written, so it is always rational.
+
+## Square roots
+
+[`root.h`](include/root.h) follows the lessons on the
+[square root](https://www.basic-mathematics.com/square-root-of-a-number.html),
+the [square root algorithm](https://www.basic-mathematics.com/square-root-algorithm.html) and
+[estimating the square root](https://www.basic-mathematics.com/estimate-the-square-root.html):
+
+| Function | Example |
+|---|---|
+| `square_root(n, decimals, round, ...)` | √2685 to 2 decimals is `51.81`; √2 to 20 decimals is `1.41421356237309504880` |
+| `square_root_between(n, &low, &high)` | √17 is between `4` and `5` |
+| `square_root_estimate(n)` | √45 ≈ 7 - 4/14 = `6.714` |
+| `root_exact(x, n, &root)` | the cube root of 125 is `5`; √2 is not a whole number |
+
+`square_root` uses the digit-by-digit algorithm from the lesson, so every
+digit is exact, up to 25 decimals.
