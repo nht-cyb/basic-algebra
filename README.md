@@ -191,3 +191,75 @@ use another method. `quadratic_vertex` finds the minimum or maximum at
 x = -b/2a, as in the
 [word problems](https://www.basic-mathematics.com/word-problems-involving-quadratic-equations.html):
 the cost `0.00002x^2 - 0.04x + 38` is lowest at `x = 1000`.
+
+## Inequalities
+
+`inequality_solve` in [`inequality.h`](include/inequality.h)
+[solves an inequality and graphs it](https://www.basic-mathematics.com/solve-and-graph-inequalities.html)
+on a number line. `./algebra` does this for any argument with `<`, `>`, `≤`
+(or `<=`), `≥` (or `>=`) or `≠` (or `!=`):
+
+```bash
+$ ./algebra "2 + 3(5 - x) >= 38"
+2 + 3(5 - x) >= 38
+  -3x + 17 ≥ 38                Use the distributive property
+  -3x ≥ 21                     Subtract 17 from each side
+  x ≤ -7                       Divide each side by -3 and reverse the inequality
+Solution: x ≤ -7, or (-∞, -7] in interval notation
+ ◀━━━━━━━━━━━━━━━━━━━●────────────────────
+-12 -11 -10 -9  -8  -7  -6  -5  -4  -3  -2
+```
+
+As in the lessons, multiplying or dividing by a negative number reverses the
+inequality. The graph uses an open circle `○` when the number is not included
+(`<`, `>`) and a closed circle `●` when it is (`≤`, `≥`).
+
+It also solves:
+
+| Kind | Example | Solution |
+|---|---|---|
+| [Compound](https://www.basic-mathematics.com/compound-inequality.html) | `x ≥ 2 and x < 4`, `x > 2 or x < -3` | `2 ≤ x < 4`, `x < -3 or x > 2` |
+| Between two numbers | `-8 < x < 8` | `-8 < x < 8` |
+| [Absolute value](https://www.basic-mathematics.com/solving-absolute-value-inequalities.html) | `\|x - 4\| < 7`, `\|3x + 3\| > 15` | `-3 < x < 11`, `x < -6 or x > 4` |
+| [All real numbers](https://www.basic-mathematics.com/inequality-with-all-real-numbers-as-solutions.html) | `5x + x + 3 > 6x + -4` | `all real numbers` |
+| [No solution](https://www.basic-mathematics.com/inequality-with-no-solutions.html) | `x < 2 and x > 9` | `no solution` |
+
+The solution is a `SolutionSet` of intervals, which `solution_set_and` and
+`solution_set_or` combine, and `solution_set_interval_notation` writes as
+`[2, 4)` or `(-∞, -6) ∪ (4, ∞)`.
+
+### Graphing linear inequalities
+
+With two variables, `./algebra`
+[graphs the inequality](https://www.basic-mathematics.com/graphing-linear-inequalities.html)
+from -10 to 10 on each axis: a dashed line `·` for `<` and `>`, a solid line
+`•` for `≤` and `≥`, and `░` over the solutions. `plane_inequality_check` is
+the test point method: for `y > (2/3)x + 1`, (-3, 4) is a solution and
+(3, 1) is not.
+
+```bash
+$ ./algebra "y > (2/3)x + 1"
+y > (2/3)x + 1
+Draw y = (2/3)x + 1 as a dashed line (it is not included) and shade above it
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░░░░░░░░░░░░░░░
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░░░░░░░░░░░░░ ·
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░░░░░░░░░ · · ·
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░░░░░░░ · ·    
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░░░ · · ·      
+░░░░░░░░░░░░░░░░░░░ │ ░░░░░ · ·          
+░░░░░░░░░░░░░░░░░░░ │ ░ · · ·            
+░░░░░░░░░░░░░░░░░░░ │ · ·                
+░░░░░░░░░░░░░░░░░ · · ·                  
+────────────────·─·─┼────────────────────
+░░░░░░░░░░░ · · ·   │                    
+░░░░░░░░░ · ·       │                    
+░░░░░ · · ·         │                    
+░░░ · ·             │                    
+· · ·               │                    
+·                   │                    
+                    │                    
+                    │                    
+                    │                    
+                    │                    
+```
