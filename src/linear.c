@@ -3,23 +3,20 @@
 #include <string.h>
 #include "linear.h"
 
-/* ---- Each side of the equation, simplified to ax + b ---- */
-
-typedef struct {
-    Fraction a; /* coefficient of the variable */
-    Fraction b; /* constant */
-} Side;
+/* ---- Each side of the equation, simplified to ax + by + c ---- */
 
 typedef struct {
     const char *s;
-    char variable; /* 0 until a letter is seen */
+    int count;                        /* variables seen so far */
+    char names[LINEAR_MAX_VARIABLES];
     const char *error;
 } Parser;
 
-static const Side zero_side = { { 0, 1 }, { 0, 1 } };
+static const LinearExpr zero_expr = { { { 0, 1 }, { 0, 1 } }, { 0, 1 } };
 
-static Side constant(Fraction b) {
-    Side x = { { 0, 1 }, b };
+static LinearExpr constant(Fraction c) {
+    LinearExpr x = zero_expr;
+    x.constant = c;
     return x;
 }
 
@@ -33,51 +30,80 @@ static Fraction negate(Fraction f) {
     return fraction_make(-f.num, f.den);
 }
 
-static Side add(Parser *p, Side x, Side y) {
-    if (fraction_add(x.a, y.a, &x.a) != 0 || fraction_add(x.b, y.b, &x.b) != 0) {
+static int has_variable(const LinearExpr *x) {
+    for (int i = 0; i < LINEAR_MAX_VARIABLES; i++) {
+        if (x->coef[i].num != 0) return 1;
+    }
+    return 0;
+}
+
+static LinearExpr add(Parser *p, LinearExpr x, LinearExpr y) {
+    int failed = fraction_add(x.constant, y.constant, &x.constant) != 0;
+    for (int i = 0; i < LINEAR_MAX_VARIABLES; i++) {
+        failed |= fraction_add(x.coef[i], y.coef[i], &x.coef[i]) != 0;
+    }
+    if (failed) {
         fail(p, "the numbers are too big");
     }
     return x;
 }
 
-static Side subtract(Parser *p, Side x, Side y) {
-    y.a = negate(y.a);
-    y.b = negate(y.b);
+static LinearExpr subtract(Parser *p, LinearExpr x, LinearExpr y) {
+    y.constant = negate(y.constant);
+    for (int i = 0; i < LINEAR_MAX_VARIABLES; i++) {
+        y.coef[i] = negate(y.coef[i]);
+    }
     return add(p, x, y);
 }
 
-/* (ax + b)(cx + d) is only linear when a or c is 0 */
-static Side multiply(Parser *p, Side x, Side y) {
-    Side r = zero_side, t;
-    if (x.a.num != 0 && y.a.num != 0) {
-        fail(p, "not linear: the variable is multiplied by itself");
+/* A product is only linear when one side is a plain number. */
+static LinearExpr multiply(Parser *p, LinearExpr x, LinearExpr y) {
+    LinearExpr r = zero_expr, t;
+    int failed;
+
+    if (has_variable(&x) && has_variable(&y)) {
+        fail(p, "not linear: it multiplies variables together");
         return r;
     }
-    if (x.a.num != 0) { /* swap so that y is the plain number */
+    if (has_variable(&x)) { /* swap so that x is the plain number */
         t = x;
         x = y;
         y = t;
     }
-    /* b(cx + d) = bcx + bd: the distributive property */
-    if (fraction_multiply(x.b, y.a, &r.a) != 0 || fraction_multiply(x.b, y.b, &r.b) != 0) {
+    /* c(ax + by + d) = cax + cby + cd: the distributive property */
+    failed = fraction_multiply(x.constant, y.constant, &r.constant) != 0;
+    for (int i = 0; i < LINEAR_MAX_VARIABLES; i++) {
+        failed |= fraction_multiply(x.constant, y.coef[i], &r.coef[i]) != 0;
+    }
+    if (failed) {
         fail(p, "the numbers are too big");
     }
     return r;
 }
 
-static Side divide(Parser *p, Side x, Side y) {
-    Side r = zero_side;
-    if (y.a.num != 0) {
-        fail(p, "not linear: it divides by the variable");
-    } else if (y.b.num == 0) {
+static LinearExpr divide(Parser *p, LinearExpr x, LinearExpr y) {
+    LinearExpr r = zero_expr;
+    int failed;
+
+    if (has_variable(&y)) {
+        fail(p, "not linear: it divides by a variable");
+        return r;
+    }
+    if (y.constant.num == 0) {
         fail(p, "it divides by 0");
-    } else if (fraction_divide(x.a, y.b, &r.a) != 0 || fraction_divide(x.b, y.b, &r.b) != 0) {
+        return r;
+    }
+    failed = fraction_divide(x.constant, y.constant, &r.constant) != 0;
+    for (int i = 0; i < LINEAR_MAX_VARIABLES; i++) {
+        failed |= fraction_divide(x.coef[i], y.constant, &r.coef[i]) != 0;
+    }
+    if (failed) {
         fail(p, "the numbers are too big");
     }
     return r;
 }
 
-/* ---- Reading the equation ---- */
+/* ---- Reading an equation ---- */
 
 static void skip_spaces(Parser *p) {
     while (isspace((unsigned char)*p->s)) p->s++;
@@ -103,10 +129,10 @@ static const char *const divide_signs[] = { "/", "÷", NULL };
 static const char *const open_bracket[] = { "(", NULL };
 static const char *const close_bracket[] = { ")", NULL };
 
-static Side parse_expr(Parser *p);
+static LinearExpr parse_expr(Parser *p);
 
 /* digits[.digits] as an exact fraction: 3.1 = 31/10 */
-static Side parse_number(Parser *p) {
+static LinearExpr parse_number(Parser *p) {
     Fraction value = { 0, 1 }, digit;
     long scale = 1;
     int after_point = 0;
@@ -126,12 +152,29 @@ static Side parse_number(Parser *p) {
     return constant(fraction_make(value.num, value.den * scale));
 }
 
-/* a number, the variable, a bracket, or a sign before one of these */
-static Side parse_factor(Parser *p) {
-    Side x = zero_side;
+static LinearExpr parse_variable(Parser *p) {
+    LinearExpr x = zero_expr;
+    char name = *p->s++;
+    int i = 0;
+
+    while (i < p->count && p->names[i] != name) i++;
+    if (i == p->count) {
+        if (p->count == LINEAR_MAX_VARIABLES) {
+            fail(p, "there are more than two variables");
+            return x;
+        }
+        p->names[p->count++] = name;
+    }
+    x.coef[i] = fraction_integer(1);
+    return x;
+}
+
+/* a number, a variable, a bracket, or a sign before one of these */
+static LinearExpr parse_factor(Parser *p) {
+    LinearExpr x;
 
     if (accept(p, minus_signs)) {
-        return subtract(p, zero_side, parse_factor(p));
+        return subtract(p, zero_expr, parse_factor(p));
     }
     if (accept(p, plus_signs)) {
         return parse_factor(p);
@@ -148,23 +191,16 @@ static Side parse_factor(Parser *p) {
         return parse_number(p);
     }
     if (isalpha((unsigned char)*p->s)) {
-        if (p->variable == 0) {
-            p->variable = *p->s;
-        } else if (p->variable != *p->s) {
-            fail(p, "there is more than one variable");
-        }
-        p->s++;
-        x.a = fraction_integer(1);
-        return x;
+        return parse_variable(p);
     }
     fail(p, *p->s == '\0' || *p->s == '=' ? "a number or variable is missing"
                                           : "it has a symbol that is not understood");
-    return x;
+    return zero_expr;
 }
 
 /* factors joined by × or ÷, or written side by side: 2x, 2(x - 4) */
-static Side parse_term(Parser *p) {
-    Side x = parse_factor(p);
+static LinearExpr parse_term(Parser *p) {
+    LinearExpr x = parse_factor(p);
     while (p->error == NULL) {
         if (accept(p, times_signs)) {
             x = multiply(p, x, parse_factor(p));
@@ -180,8 +216,8 @@ static Side parse_term(Parser *p) {
 }
 
 /* terms joined by + or - */
-static Side parse_expr(Parser *p) {
-    Side x = parse_term(p);
+static LinearExpr parse_expr(Parser *p) {
+    LinearExpr x = parse_term(p);
     while (p->error == NULL) {
         if (accept(p, plus_signs)) {
             x = add(p, x, parse_term(p));
@@ -194,52 +230,82 @@ static Side parse_expr(Parser *p) {
     return x;
 }
 
-/* ---- Writing the steps ---- */
+const char *linear_parse(const char *text, LinearEquation *out) {
+    Parser p = { text, 0, { 0 }, NULL };
 
-static int is_zero(Fraction f) { return f.num == 0; }
-static int is_one(Fraction f) { return f.num == f.den; }
+    memset(out, 0, sizeof *out);
+    out->left = parse_expr(&p);
+    skip_spaces(&p);
+    if (p.error == NULL && *p.s != '=') {
+        fail(&p, *p.s == '\0' ? "there is no = sign" : "it has a symbol that is not understood");
+    }
+    if (p.error == NULL) {
+        p.s++;
+        out->right = parse_expr(&p);
+        skip_spaces(&p);
+        if (p.error == NULL && *p.s != '\0') {
+            fail(&p, *p.s == '=' ? "there is more than one = sign" : "it has a symbol that is not understood");
+        }
+    }
+    out->count = p.count;
+    memcpy(out->names, p.names, sizeof out->names);
+    return p.error;
+}
 
-/* "x", "-x", "4x", "(2/5)x", "-(2/5)x" */
+/* ---- Writing equations ---- */
+
+/* "x", "4x", "(2/5)x", without the sign */
 static void format_term(Fraction a, char variable, char *out, size_t size) {
     char num[48];
-    a = fraction_make(a.num, a.den);
     if (a.num == a.den) {
         snprintf(out, size, "%c", variable);
-    } else if (a.num == -a.den) {
-        snprintf(out, size, "-%c", variable);
     } else if (a.den == 1) {
         snprintf(out, size, "%ld%c", a.num, variable);
     } else {
-        fraction_format(fraction_make(a.num < 0 ? -a.num : a.num, a.den), num, sizeof num);
-        snprintf(out, size, "%s(%s)%c", a.num < 0 ? "-" : "", num, variable);
+        fraction_format(a, num, sizeof num);
+        snprintf(out, size, "(%s)%c", num, variable);
     }
 }
 
-/* "4x - 12", "x", "20", "0" */
-static void format_side(Side x, char variable, char *out, size_t size) {
-    char term[64], num[48];
-    if (is_zero(x.a)) {
-        fraction_format(x.b, out, size);
-        return;
+int linear_format(const LinearExpr *e, const char *names, int count, char *out, size_t size) {
+    char part[64];
+    size_t len = 0;
+    int first = 1, n;
+
+    if (size == 0) return -1;
+    out[0] = '\0';
+    for (int i = 0; i <= count; i++) {
+        Fraction f = fraction_make(i < count ? e->coef[i].num : e->constant.num,
+                                   i < count ? e->coef[i].den : e->constant.den);
+        int negative = f.num < 0;
+
+        if (f.num == 0 && !(i == count && first)) {
+            continue; /* skip zero terms, but write "0" if nothing else */
+        }
+        if (negative) f.num = -f.num;
+        if (i < count) {
+            format_term(f, names[i], part, sizeof part);
+        } else {
+            fraction_format(f, part, sizeof part);
+        }
+        n = snprintf(out + len, size - len, "%s%s",
+                     first ? (negative ? "-" : "") : (negative ? " - " : " + "), part);
+        if (n < 0 || (size_t)n >= size - len) return -1;
+        len += (size_t)n;
+        first = 0;
     }
-    format_term(x.a, variable, term, sizeof term);
-    if (is_zero(x.b)) {
-        snprintf(out, size, "%s", term);
-        return;
-    }
-    fraction_format(x.b.num < 0 ? negate(x.b) : x.b, num, sizeof num);
-    snprintf(out, size, "%s %c %s", term, x.b.num < 0 ? '-' : '+', num);
+    return (int)len;
 }
 
-static void add_step(LinearSolution *out, Side left, Side right, const char *action) {
+static void add_step(LinearSolution *out, LinearExpr left, LinearExpr right, const char *action) {
     LinearStep *step;
     char l[62], r[62]; /* so "l = r" always fits in step->equation */
     if (out->step_count == LINEAR_MAX_STEPS) {
         return;
     }
     step = &out->steps[out->step_count++];
-    format_side(left, out->variable, l, sizeof l);
-    format_side(right, out->variable, r, sizeof r);
+    linear_format(&left, &out->variable, 1, l, sizeof l);
+    linear_format(&right, &out->variable, 1, r, sizeof r);
     snprintf(step->equation, sizeof step->equation, "%s = %s", l, r);
     snprintf(step->action, sizeof step->action, "%s", action);
 }
@@ -257,6 +323,9 @@ static int same_ignoring_spaces(const char *a, const char *b) {
 
 /* ---- Solving ---- */
 
+static int is_zero(Fraction f) { return f.num == 0; }
+static int is_one(Fraction f) { return f.num == f.den; }
+
 static LinearKind invalid(LinearSolution *out, const char *error) {
     out->kind = LINEAR_INVALID;
     out->error = error;
@@ -264,34 +333,27 @@ static LinearKind invalid(LinearSolution *out, const char *error) {
 }
 
 LinearKind linear_solve(const char *equation, LinearSolution *out) {
-    Parser p = { equation, 0, NULL };
-    Side left, right = zero_side, t;
+    LinearEquation eq;
+    LinearExpr left, right, t;
     char action[96], term[64], num[48];
+    const char *error;
     Fraction a;
     size_t len;
 
+    error = linear_parse(equation, &eq);
     memset(out, 0, sizeof *out);
-
-    left = parse_expr(&p);
-    skip_spaces(&p);
-    if (p.error == NULL && *p.s != '=') {
-        fail(&p, *p.s == '\0' ? "there is no = sign" : "it has a symbol that is not understood");
+    if (error != NULL) {
+        return invalid(out, error);
     }
-    if (p.error == NULL) {
-        p.s++;
-        right = parse_expr(&p);
-        skip_spaces(&p);
-        if (p.error == NULL && *p.s != '\0') {
-            fail(&p, *p.s == '=' ? "there is more than one = sign" : "it has a symbol that is not understood");
-        }
-    }
-    if (p.error != NULL) {
-        return invalid(out, p.error);
-    }
-    if (p.variable == 0) {
+    if (eq.count == 0) {
         return invalid(out, "there is no variable to solve for");
     }
-    out->variable = p.variable;
+    if (eq.count > 1) {
+        return invalid(out, "there is more than one variable");
+    }
+    out->variable = eq.names[0];
+    left = eq.left;
+    right = eq.right;
 
     /* the equation as given */
     while (isspace((unsigned char)*equation)) equation++;
@@ -307,7 +369,7 @@ LinearKind linear_solve(const char *equation, LinearSolution *out) {
     }
 
     /* 60 = 2n + 4 becomes 2n + 4 = 60, so the variable is on the left */
-    if (is_zero(left.a) && !is_zero(right.a)) {
+    if (is_zero(left.coef[0]) && !is_zero(right.coef[0])) {
         t = left;
         left = right;
         right = t;
@@ -315,37 +377,39 @@ LinearKind linear_solve(const char *equation, LinearSolution *out) {
     }
 
     /* 9x - 12 = 5x + 8: subtract 5x from each side */
-    if (!is_zero(right.a)) {
-        format_term(right.a.num < 0 ? negate(right.a) : right.a, out->variable, term, sizeof term);
+    if (!is_zero(right.coef[0])) {
+        a = right.coef[0];
+        format_term(a.num < 0 ? negate(a) : a, out->variable, term, sizeof term);
         snprintf(action, sizeof action, "%s %s %s each side",
-                 right.a.num < 0 ? "Add" : "Subtract", term, right.a.num < 0 ? "to" : "from");
-        if (fraction_add(left.a, negate(right.a), &left.a) != 0) {
+                 a.num < 0 ? "Add" : "Subtract", term, a.num < 0 ? "to" : "from");
+        if (fraction_add(left.coef[0], negate(a), &left.coef[0]) != 0) {
             return invalid(out, "the numbers are too big");
         }
-        right.a = fraction_integer(0);
+        right.coef[0] = fraction_integer(0);
         add_step(out, left, right, action);
     }
 
-    if (is_zero(left.a)) { /* the variable cancelled out */
-        out->kind = fraction_equal(left.b, right.b) ? LINEAR_ALL_NUMBERS : LINEAR_NO_SOLUTION;
+    if (is_zero(left.coef[0])) { /* the variable cancelled out */
+        out->kind = fraction_equal(left.constant, right.constant) ? LINEAR_ALL_NUMBERS : LINEAR_NO_SOLUTION;
         return out->kind;
     }
 
     /* 4x - 12 = 8: add 12 to each side */
-    if (!is_zero(left.b)) {
-        fraction_format(left.b.num < 0 ? negate(left.b) : left.b, num, sizeof num);
+    if (!is_zero(left.constant)) {
+        a = left.constant;
+        fraction_format(a.num < 0 ? negate(a) : a, num, sizeof num);
         snprintf(action, sizeof action, "%s %s %s each side",
-                 left.b.num < 0 ? "Add" : "Subtract", num, left.b.num < 0 ? "to" : "from");
-        if (fraction_add(right.b, negate(left.b), &right.b) != 0) {
+                 a.num < 0 ? "Add" : "Subtract", num, a.num < 0 ? "to" : "from");
+        if (fraction_add(right.constant, negate(a), &right.constant) != 0) {
             return invalid(out, "the numbers are too big");
         }
-        left.b = fraction_integer(0);
+        left.constant = fraction_integer(0);
         add_step(out, left, right, action);
     }
 
     /* 4x = 20: divide each side by 4. (2/5)x = 10: multiply each side
        by the reciprocal, 5/2. */
-    a = left.a;
+    a = left.coef[0];
     if (!is_one(a)) {
         if (a.den == 1) {
             snprintf(action, sizeof action, "Divide each side by %ld", a.num);
@@ -353,14 +417,14 @@ LinearKind linear_solve(const char *equation, LinearSolution *out) {
             fraction_format(fraction_make(a.den, a.num), num, sizeof num);
             snprintf(action, sizeof action, "Multiply each side by %s", num);
         }
-        if (fraction_divide(right.b, a, &right.b) != 0) {
+        if (fraction_divide(right.constant, a, &right.constant) != 0) {
             return invalid(out, "the numbers are too big");
         }
-        left.a = fraction_integer(1);
+        left.coef[0] = fraction_integer(1);
         add_step(out, left, right, action);
     }
 
     out->kind = LINEAR_ONE_SOLUTION;
-    out->value = right.b;
+    out->value = right.constant;
     return out->kind;
 }

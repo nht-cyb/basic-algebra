@@ -119,3 +119,32 @@ to multiply it (`2x`, `2(x - 4)`, `(2/5)x`). Answers are exact fractions, so
 It also says when an equation has no solution (`x + 1 = x + 2`), when every
 number is a solution (`2(x + 1) = 2x + 2`), and why it cannot solve one, for
 example `x*x = 4` (not linear) or `y = 2x + 5` (two variables).
+
+## Systems of linear equations
+
+`system_solve` in [`system.h`](include/system.h) solves two linear equations in
+two variables with the
+[elimination method](https://www.basic-mathematics.com/elimination-method.html),
+step by step. Give `./algebra` the two equations separated by `;`:
+
+```bash
+$ ./algebra "3x + y = 10; -4x - 2y = 2"
+  3x + y = 10              Equation 1
+  -4x - 2y = 2             Equation 2
+  6x + 2y = 20             Multiply equation 1 by 2
+  2x = 22                  Add the two equations to eliminate y
+  x = 11                   Divide each side by 2
+  y + 33 = 10              Substitute x = 11 into equation 1
+  y = -23                  Subtract 33 from each side
+Solution: x = 11, y = -23
+```
+
+Following [the number of solutions](https://www.basic-mathematics.com/solutions-of-systems-of-linear-equations.html),
+it says whether the system has one solution, no solution (parallel lines,
+e.g. `y = 3x + 5; y = 3x - 8`), or infinitely many solutions (the same line
+twice). For infinitely many it gives the line, as in
+[this lesson](https://www.basic-mathematics.com/solve-a-system-without-a-unique-solution.html):
+`4x - y = 5; -4x + y = -5` gives every `(x, y)` with `y = 4x - 5`.
+
+The equations can be written in any linear form, such as `y = (2/5)x + 1`,
+`25 × q + 10 × d = 450` or `2(x + y) = 3x - 1`.
