@@ -8,6 +8,12 @@
    and -1 if there is no real root (n < 1, or x < 0 with n even). */
 int root_exact(long x, long n, long *root);
 
+/* Simplifies sqrt(n) to outside·sqrt(inside) by taking out square
+   factors: sqrt(1256) = 2·sqrt(314), sqrt(36) = 6·sqrt(1). Square factors
+   above 1,000,000 are not looked for, so for very large n the result is
+   right but may not be fully simplified. n must be at least 0. */
+void root_simplify(long n, long *outside, long *inside);
+
 /* The principal square root of n using the square root algorithm:
    group the digits in pairs, then find each digit of the root in turn.
    Writes the root with the given number of decimals, e.g.

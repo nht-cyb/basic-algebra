@@ -2,14 +2,55 @@
 #include <string.h>
 #include "expression.h"
 #include "linear.h"
+#include "quadratic.h"
 #include "system.h"
+
+static QuadraticMethod method = QUADRATIC_FORMULA;
+
+/* "x^2 + 3x + 2 = 0": prints the steps and the solutions */
+static int solve_quadratic(const char *equation) {
+    QuadraticSolution s;
+
+    quadratic_solve(equation, method, &s);
+    if (s.kind == QUADRATIC_INVALID) {
+        printf("%s -> cannot solve: %s\n", equation, s.error);
+        return 1;
+    }
+    for (int i = 0; i < s.step_count; i++) {
+        if (i == 0) {
+            printf("%s\n", s.steps[i].equation);
+        } else {
+            printf("  %-30s %s\n", s.steps[i].equation, s.steps[i].action);
+        }
+    }
+    switch (s.kind) {
+    case QUADRATIC_TWO_REAL:
+        printf("Two solutions: %s", s.text);
+        if (!s.rational) printf(" (about %.4f and %.4f)", s.approx[0], s.approx[1]);
+        printf("\n");
+        break;
+    case QUADRATIC_ONE_REAL:
+        printf("One solution: %s\n", s.text);
+        break;
+    default:
+        printf("No real solution: %s\n", s.text);
+        break;
+    }
+    return 0;
+}
 
 /* "2x - 2 = 6": prints the steps and the solution */
 static int solve(const char *equation) {
     LinearSolution s;
     char value[48];
 
+    if (strchr(equation, '^') != NULL || strstr(equation, "²") != NULL) {
+        return solve_quadratic(equation);
+    }
     linear_solve(equation, &s);
+    if (s.kind == LINEAR_INVALID && strstr(s.error, "multiplies variables") != NULL) {
+        return solve_quadratic(equation); /* (9 - w)w = 14 */
+    }
     if (s.kind == LINEAR_INVALID) {
         printf("%s -> cannot solve: %s\n", equation, s.error);
         return 1;
@@ -85,11 +126,25 @@ static int translate(const char *phrase) {
 int main(int argc, char **argv) {
     int failed = 0;
 
+    if (argc > 1 && strncmp(argv[1], "--", 2) == 0) {
+        if (strcmp(argv[1], "--factoring") == 0) {
+            method = QUADRATIC_FACTORING;
+        } else if (strcmp(argv[1], "--square") == 0) {
+            method = QUADRATIC_COMPLETING_THE_SQUARE;
+        } else if (strcmp(argv[1], "--formula") != 0) {
+            fprintf(stderr, "%s: unknown option %s\n", argv[0], argv[1]);
+            return 2;
+        }
+        argv++;
+        argc--;
+    }
+
     if (argc < 2) {
-        fprintf(stderr, "usage: %s \"phrase or equation\" ...\n", argv[0]);
+        fprintf(stderr, "usage: %s [--formula | --factoring | --square] \"phrase or equation\" ...\n", argv[0]);
         fprintf(stderr, "example: %s \"Seven more than three times a number x\"\n", argv[0]);
         fprintf(stderr, "example: %s \"9x - 12 = 5x + 8\"\n", argv[0]);
         fprintf(stderr, "example: %s \"x + y = 20; x - y = 10\"\n", argv[0]);
+        fprintf(stderr, "example: %s --factoring \"x^2 + 3x + 2 = 0\"\n", argv[0]);
         return 2;
     }
 

@@ -41,6 +41,24 @@ int root_exact(long x, long n, long *root) {
     return 0;
 }
 
+void root_simplify(long n, long *outside, long *inside) {
+    long out = 1, r;
+
+    if (root_exact(n, 2, &r) == 1) { /* a perfect square, even a big one */
+        *outside = r;
+        *inside = 1;
+        return;
+    }
+    for (long p = 2; p <= 1000000 && p * p <= n; p++) {
+        while (n % (p * p) == 0) {
+            n /= p * p;
+            out *= p;
+        }
+    }
+    *outside = out;
+    *inside = n;
+}
+
 /* Writes the digits of v, with a decimal point before the last
    `decimals` digits. */
 static int write_fixed(u128 v, int decimals, char *out, size_t size) {
