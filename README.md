@@ -263,3 +263,47 @@ Draw y = (2/3)x + 1 as a dashed line (it is not included) and shade above it
                     │                    
                     │                    
 ```
+
+## Absolute value equations
+
+`absolute_solve` in [`absolute.h`](include/absolute.h) solves equations with
+absolute values step by step. `./algebra` uses it for any equation with `|`:
+
+```bash
+$ ./algebra "4|2x - 1| - 8 = 12"
+4|2x - 1| - 8 = 12
+  4|2x - 1| = 20                     Add 8 to each side
+  |2x - 1| = 5                       Divide each side by 4
+  2x - 1 = 5 or 2x - 1 = -5          |2x - 1| = 5 means 2x - 1 = 5 or 2x - 1 = -5
+  2x - 1 = 5                         Solve the first equation
+  2x = 6                             Add 1 to each side
+  x = 3                              Divide each side by 2
+  2x - 1 = -5                        Solve the second equation
+  2x = -4                            Add 1 to each side
+  x = -2                             Divide each side by 2
+  x = -2 or x = 3                    The solutions
+Solution: x = -2 or x = 3
+```
+
+With one absolute value, it follows the lessons on
+[solving](https://www.basic-mathematics.com/solving-absolute-value-equations.html) and
+[multi-step](https://www.basic-mathematics.com/solve-multi-step-absolute-value-equations.html)
+absolute value equations: get `|A|` alone, then `|A| = k` means `A = k` or
+`A = -k`. If `k` is negative there is no solution.
+
+With more than one absolute value, or the variable outside the bars, it uses
+the method from
+[tough absolute value equations](https://www.basic-mathematics.com/solve-tough-absolute-value-equations.html):
+find where each expression inside `|...|` is 0, solve in each region between
+those numbers, and keep the answers that are in their region.
+
+| Equation | Solution |
+|---|---|
+| `6\|2x + 3\| - 7 = 2\|2x + 3\| + 1` | `x = -5/2 or x = -1/2` |
+| `\|2x + 6\| + - 3 + \|3x - 4\| = 9` | `x = -2 or x = 2` |
+| `\|x - 1\| = 2x` | `x = 1/3` |
+| `\|x\| + \|x - 1\| = 1` | `0 ≤ x ≤ 1` |
+
+`absolute_value_evaluate` works out a number with absolute values, using the
+[definition](https://www.basic-mathematics.com/definition-of-absolute-value.html):
+`./algebra "|-8 + 2 × 5|"` prints `|-8 + 2 × 5| = 2`.

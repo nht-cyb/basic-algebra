@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include "absolute.h"
 #include "expression.h"
 #include "inequality.h"
 #include "linear.h"
@@ -40,11 +41,33 @@ static int solve_quadratic(const char *equation) {
     return 0;
 }
 
+/* "4|2x - 1| - 8 = 12": prints the steps and the solutions */
+static int solve_absolute(const char *equation) {
+    AbsoluteSolution s;
+
+    if (!absolute_solve(equation, &s)) {
+        printf("%s -> cannot solve: %s\n", equation, s.error);
+        return 1;
+    }
+    for (int i = 0; i < s.step_count; i++) {
+        if (i == 0) {
+            printf("%s\n", s.steps[i].equation);
+        } else {
+            printf("  %-34s %s\n", s.steps[i].equation, s.steps[i].action);
+        }
+    }
+    printf("Solution: %s\n", s.text);
+    return 0;
+}
+
 /* "2x - 2 = 6": prints the steps and the solution */
 static int solve(const char *equation) {
     LinearSolution s;
     char value[48];
 
+    if (strchr(equation, '|') != NULL) {
+        return solve_absolute(equation);
+    }
     if (strchr(equation, '^') != NULL || strstr(equation, "²") != NULL) {
         return solve_quadratic(equation);
     }
@@ -146,11 +169,21 @@ static int has_relation(const char *s) {
            strstr(s, "≤") != NULL || strstr(s, "≥") != NULL || strstr(s, "≠") != NULL;
 }
 
-/* "Seven more than three times a number x": prints 3x + 7 */
+/* "Seven more than three times a number x": prints 3x + 7.
+   A number with absolute values, such as "|-8 + 2 × 5|", is worked out. */
 static int translate(const char *phrase) {
     char text[256];
-    Expr *e = expr_parse(phrase);
-    int failed = e == NULL || expr_format(e, text, sizeof text) < 0;
+    Fraction value;
+    Expr *e;
+    int failed;
+
+    if (strchr(phrase, '|') != NULL && absolute_value_evaluate(phrase, &value) == 0) {
+        fraction_format(value, text, sizeof text);
+        printf("%s = %s\n", phrase, text);
+        return 0;
+    }
+    e = expr_parse(phrase);
+    failed = e == NULL || expr_format(e, text, sizeof text) < 0;
 
     if (failed) {
         printf("%s -> (not understood)\n", phrase);
@@ -184,6 +217,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "example: %s \"x + y = 20; x - y = 10\"\n", argv[0]);
         fprintf(stderr, "example: %s --factoring \"x^2 + 3x + 2 = 0\"\n", argv[0]);
         fprintf(stderr, "example: %s \"|x - 4| < 7\"\n", argv[0]);
+        fprintf(stderr, "example: %s \"4|2x - 1| - 8 = 12\"\n", argv[0]);
         return 2;
     }
 
