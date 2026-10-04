@@ -89,3 +89,33 @@ the [square root algorithm](https://www.basic-mathematics.com/square-root-algori
 
 `square_root` uses the digit-by-digit algorithm from the lesson, so every
 digit is exact, up to 25 decimals.
+
+## Linear equations
+
+`linear_solve` in [`linear.h`](include/linear.h) solves a linear equation in
+one variable, step by step, the way the lessons do:
+[one-step](https://www.basic-mathematics.com/solve-one-step-equations.html),
+[multiplication](https://www.basic-mathematics.com/solving-multiplication-equations.html),
+[two-step](https://www.basic-mathematics.com/solving-two-step-equations.html),
+[variable on both sides](https://www.basic-mathematics.com/solving-an-equation-with-a-variable-on-both-sides.html) and
+[distributive property](https://www.basic-mathematics.com/solve-equations-using-the-distributive-property.html).
+
+`./algebra` solves any argument that has an `=` sign:
+
+```bash
+$ ./algebra "9x - 12 = 5x + 8"
+9x - 12 = 5x + 8
+  4x - 12 = 8              Subtract 5x from each side
+  4x = 20                  Add 12 to each side
+  x = 5                    Divide each side by 4
+Solution: x = 5
+```
+
+It understands numbers (`2`, `3.1`), one letter as the variable, `+ - * /`,
+`×`, `÷`, brackets, and a number or bracket written in front of the variable
+to multiply it (`2x`, `2(x - 4)`, `(2/5)x`). Answers are exact fractions, so
+`1.5x = 0.75` gives `x = 1/2`.
+
+It also says when an equation has no solution (`x + 1 = x + 2`), when every
+number is a solution (`2(x + 1) = 2x + 2`), and why it cannot solve one, for
+example `x*x = 4` (not linear) or `y = 2x + 5` (two variables).
